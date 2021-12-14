@@ -51,7 +51,7 @@ public class DynamicDataSource {
                 return localDataSourceService;
             } else {
                 if (basicDataSourceService == null) {
-                    basicDataSourceService = new PgExternalDataSourceServiceImpl();
+                    basicDataSourceService = new ExternalDataSourceServiceImpl();
                     basicDataSourceService.init();
                 }
                 return basicDataSourceService;
