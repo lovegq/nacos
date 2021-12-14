@@ -21,6 +21,7 @@ import com.alibaba.nacos.auth.common.AuthSystemTypes;
 import com.alibaba.nacos.auth.exception.AccessException;
 import com.alibaba.nacos.console.security.nacos.NacosAuthManager;
 import com.alibaba.nacos.console.security.nacos.users.NacosUser;
+import com.alibaba.nacos.console.utils.PasswordEncoderUtil;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.Before;
 import org.junit.Test;
@@ -39,23 +40,23 @@ import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
 public class UserControllerTest {
-    
+
     @Mock
     private HttpServletRequest request;
-    
+
     @Mock
     private HttpServletResponse response;
-    
+
     @Mock
     private AuthConfigs authConfigs;
-    
+
     @Mock
     private NacosAuthManager authManager;
-    
+
     private UserController userController;
-    
+
     private NacosUser user;
-    
+
     @Before
     public void setUp() throws Exception {
         userController = new UserController();
@@ -66,7 +67,7 @@ public class UserControllerTest {
         injectObject("authConfigs", authConfigs);
         injectObject("authManager", authManager);
     }
-    
+
     @Test
     public void testLoginWithAuthedUser() throws AccessException {
         when(authManager.login(request)).thenReturn(user);
@@ -79,10 +80,16 @@ public class UserControllerTest {
         assertTrue(actualString.contains("\"tokenTtl\":18000"));
         assertTrue(actualString.contains("\"globalAdmin\":true"));
     }
-    
+
     private void injectObject(String fieldName, Object value) throws NoSuchFieldException, IllegalAccessException {
         Field field = UserController.class.getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(userController, value);
+    }
+
+    @Test
+    public void test2() {
+        final String nacos = PasswordEncoderUtil.encode("nacos");
+        System.out.println(nacos);
     }
 }

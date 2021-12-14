@@ -22,7 +22,6 @@ import com.alibaba.nacos.auth.common.ActionTypes;
 import com.alibaba.nacos.auth.common.AuthConfigs;
 import com.alibaba.nacos.auth.common.AuthSystemTypes;
 import com.alibaba.nacos.auth.exception.AccessException;
-import com.alibaba.nacos.common.model.RestResult;
 import com.alibaba.nacos.common.model.RestResultUtils;
 import com.alibaba.nacos.common.utils.JacksonUtils;
 import com.alibaba.nacos.config.server.auth.RoleInfo;
@@ -43,14 +42,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -67,25 +59,25 @@ import java.util.Objects;
 @RestController("user")
 @RequestMapping({"/v1/auth", "/v1/auth/users"})
 public class UserController {
-    
+
     @Autowired
     private JwtTokenManager jwtTokenManager;
-    
+
     @Autowired
     private AuthenticationManager authenticationManager;
-    
+
     @Autowired
     private NacosUserDetailsServiceImpl userDetailsService;
-    
+
     @Autowired
     private NacosRoleServiceImpl roleService;
-    
+
     @Autowired
     private AuthConfigs authConfigs;
-    
+
     @Autowired
     private NacosAuthManager authManager;
-    
+
     /**
      * Create a new user.
      *
@@ -98,7 +90,7 @@ public class UserController {
     @Secured(resource = NacosAuthConfig.CONSOLE_RESOURCE_NAME_PREFIX + "users", action = ActionTypes.WRITE)
     @PostMapping
     public Object createUser(@RequestParam String username, @RequestParam String password) {
-        
+
         User user = userDetailsService.getUserFromDatabase(username);
         if (user != null) {
             throw new IllegalArgumentException("user '" + username + "' already exist!");
@@ -106,7 +98,7 @@ public class UserController {
         userDetailsService.createUser(username, PasswordEncoderUtil.encode(password));
         return RestResultUtils.success("create user ok!");
     }
-    
+
     /**
      * Delete an existed user.
      *
@@ -128,14 +120,14 @@ public class UserController {
         userDetailsService.deleteUser(username);
         return RestResultUtils.success("delete user ok!");
     }
-    
+
     /**
      * Update an user.
      *
      * @param username    username of user
      * @param newPassword new password of user
-     * @param response http response
-     * @param request http request
+     * @param response    http response
+     * @param request     http request
      * @return ok if update succeed
      * @throws IllegalArgumentException if user not exist or oldPassword is incorrect
      * @since 1.2.0
@@ -143,7 +135,7 @@ public class UserController {
     @PutMapping
     @Secured(resource = NacosAuthConfig.UPDATE_PASSWORD_ENTRY_POINT, action = ActionTypes.WRITE)
     public Object updateUser(@RequestParam String username, @RequestParam String newPassword,
-            HttpServletResponse response, HttpServletRequest request) throws IOException {
+                             HttpServletResponse response, HttpServletRequest request) throws IOException {
         // admin or same user
         if (!hasPermission(username, request)) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "authorization failed!");
@@ -153,9 +145,9 @@ public class UserController {
         if (user == null) {
             throw new IllegalArgumentException("user " + username + " not exist!");
         }
-        
+
         userDetailsService.updateUserPassword(username, PasswordEncoderUtil.encode(newPassword));
-        
+
         return RestResultUtils.success("update user ok!");
     }
 
@@ -175,7 +167,7 @@ public class UserController {
         // same user
         return user.getUserName().equals(username);
     }
-    
+
     /**
      * Get paged users.
      *
@@ -189,7 +181,7 @@ public class UserController {
     public Object getUsers(@RequestParam int pageNo, @RequestParam int pageSize) {
         return userDetailsService.getUsersFromDatabase(pageNo, pageSize);
     }
-    
+
     /**
      * Login to Nacos
      *
@@ -204,14 +196,14 @@ public class UserController {
      */
     @PostMapping("/login")
     public Object login(@RequestParam String username, @RequestParam String password, HttpServletResponse response,
-            HttpServletRequest request) throws AccessException {
-        
+                        HttpServletRequest request) throws AccessException {
+
         if (AuthSystemTypes.NACOS.name().equalsIgnoreCase(authConfigs.getNacosAuthSystemType()) || AuthSystemTypes.LDAP
                 .name().equalsIgnoreCase(authConfigs.getNacosAuthSystemType())) {
             NacosUser user = (NacosUser) authManager.login(request);
-            
+
             response.addHeader(NacosAuthConfig.AUTHORIZATION_HEADER, NacosAuthConfig.TOKEN_PREFIX + user.getToken());
-            
+
             ObjectNode result = JacksonUtils.createEmptyJsonNode();
             result.put(Constants.ACCESS_TOKEN, user.getToken());
             result.put(Constants.TOKEN_TTL, authConfigs.getTokenValidityInSeconds());
@@ -219,11 +211,11 @@ public class UserController {
             result.put(Constants.USERNAME, user.getUserName());
             return result;
         }
-        
+
         // create Authentication class through username and password, the implement class is UsernamePasswordAuthenticationToken
         UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(username,
                 password);
-        
+
         try {
             // use the method authenticate of AuthenticationManager(default implement is ProviderManager) to valid Authentication
             Authentication authentication = authenticationManager.authenticate(authenticationToken);
@@ -238,35 +230,6 @@ public class UserController {
             return RestResultUtils.failed(HttpStatus.UNAUTHORIZED.value(), null, "Login failed");
         }
     }
-    
-    /**
-     * Update password.
-     *
-     * @param oldPassword old password
-     * @param newPassword new password
-     * @return Code 200 if update successfully, Code 401 if old password invalid, otherwise 500
-     */
-    @PutMapping("/password")
-    @Deprecated
-    public RestResult<String> updatePassword(@RequestParam(value = "oldPassword") String oldPassword,
-            @RequestParam(value = "newPassword") String newPassword) {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        String username = ((UserDetails) principal).getUsername();
-        User user = userDetailsService.getUserFromDatabase(username);
-        String password = user.getPassword();
-        
-        // TODO: throw out more fine grained exceptions
-        try {
-            if (PasswordEncoderUtil.matches(oldPassword, password)) {
-                userDetailsService.updateUserPassword(username, PasswordEncoderUtil.encode(newPassword));
-                return RestResultUtils.success("Update password success");
-            }
-            return RestResultUtils.failed(HttpStatus.UNAUTHORIZED.value(), "Old password is invalid");
-        } catch (Exception e) {
-            return RestResultUtils.failed(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Update userpassword failed");
-        }
-    }
-
 
     /**
      * Fuzzy matching username.
