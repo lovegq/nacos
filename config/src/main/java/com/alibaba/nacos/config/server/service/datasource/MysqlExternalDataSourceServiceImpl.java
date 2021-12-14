@@ -45,7 +45,7 @@ import static com.alibaba.nacos.config.server.utils.LogUtil.FATAL_LOG;
  *
  * @author Nacos
  */
-public class ExternalDataSourceServiceImpl implements DataSourceService {
+public class MysqlExternalDataSourceServiceImpl implements DataSourceService {
     
     /**
      * JDBC execute timeout value, unit:second.
