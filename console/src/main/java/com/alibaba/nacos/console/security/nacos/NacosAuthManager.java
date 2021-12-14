@@ -29,6 +29,8 @@ import com.alibaba.nacos.console.security.nacos.roles.NacosRoleServiceImpl;
 import com.alibaba.nacos.console.security.nacos.users.NacosUser;
 import com.alibaba.nacos.core.utils.Loggers;
 import io.jsonwebtoken.ExpiredJwtException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -48,22 +50,22 @@ import java.util.List;
  */
 @Component
 public class NacosAuthManager implements AuthManager {
-    
+    Logger logger = LoggerFactory.getLogger(NacosAuthManager.class);
     private static final String TOKEN_PREFIX = "Bearer ";
-    
+
     private static final String PARAM_USERNAME = "username";
-    
+
     private static final String PARAM_PASSWORD = "password";
-    
+
     @Autowired
     private JwtTokenManager tokenManager;
-    
+
     @Autowired
     private AuthenticationManager authenticationManager;
-    
+
     @Autowired
     private NacosRoleServiceImpl roleService;
-    
+
     @Override
     public User login(Object request) throws AccessException {
         HttpServletRequest req = (HttpServletRequest) request;
@@ -71,7 +73,7 @@ public class NacosAuthManager implements AuthManager {
         if (StringUtils.isBlank(token)) {
             throw new AccessException("user not found!");
         }
-        
+
         try {
             tokenManager.validateToken(token);
         } catch (ExpiredJwtException e) {
@@ -79,10 +81,10 @@ public class NacosAuthManager implements AuthManager {
         } catch (Exception e) {
             throw new AccessException("token invalid!");
         }
-        
+
         Authentication authentication = tokenManager.getAuthentication(token);
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        
+
         String username = authentication.getName();
         NacosUser user = new NacosUser();
         user.setUserName(username);
@@ -99,7 +101,7 @@ public class NacosAuthManager implements AuthManager {
         req.setAttribute(RequestUtil.NACOS_USER_KEY, user);
         return user;
     }
-    
+
     @Override
     public User loginRemote(Object request) throws AccessException {
         Request req = (Request) request;
@@ -107,7 +109,7 @@ public class NacosAuthManager implements AuthManager {
         if (StringUtils.isBlank(token)) {
             throw new AccessException("user not found!");
         }
-        
+
         try {
             tokenManager.validateToken(token);
         } catch (ExpiredJwtException e) {
@@ -115,10 +117,10 @@ public class NacosAuthManager implements AuthManager {
         } catch (Exception e) {
             throw new AccessException("token invalid!");
         }
-        
+
         Authentication authentication = tokenManager.getAuthentication(token);
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        
+
         String username = authentication.getName();
         NacosUser user = new NacosUser();
         user.setUserName(username);
@@ -134,18 +136,18 @@ public class NacosAuthManager implements AuthManager {
         }
         return user;
     }
-    
+
     @Override
     public void auth(Permission permission, User user) throws AccessException {
         if (Loggers.AUTH.isDebugEnabled()) {
             Loggers.AUTH.debug("auth permission: {}, user: {}", permission, user);
         }
-        
+
         if (!roleService.hasPermission(user.getUserName(), permission)) {
             throw new AccessException("authorization failed!");
         }
     }
-    
+
     /**
      * Get token from header.
      */
@@ -160,10 +162,10 @@ public class NacosAuthManager implements AuthManager {
             String password = request.getParameter(PARAM_PASSWORD);
             bearerToken = resolveTokenFromUser(userName, password);
         }
-        
+
         return bearerToken;
     }
-    
+
     /**
      * Get token from header.
      */
@@ -178,10 +180,10 @@ public class NacosAuthManager implements AuthManager {
             String password = request.getHeader(PARAM_PASSWORD);
             bearerToken = resolveTokenFromUser(userName, password);
         }
-        
+
         return bearerToken;
     }
-    
+
     private String resolveTokenFromUser(String userName, String rawPassword) throws AccessException {
         String finalName;
         Authentication authenticate;
@@ -190,15 +192,16 @@ public class NacosAuthManager implements AuthManager {
                     rawPassword);
             authenticate = authenticationManager.authenticate(authenticationToken);
         } catch (AuthenticationException e) {
+            logger.error("认证失败", e);
             throw new AccessException("unknown user!");
         }
-        
+
         if (null == authenticate || StringUtils.isBlank(authenticate.getName())) {
             finalName = userName;
         } else {
             finalName = authenticate.getName();
         }
-        
+
         return tokenManager.createToken(finalName);
     }
 }

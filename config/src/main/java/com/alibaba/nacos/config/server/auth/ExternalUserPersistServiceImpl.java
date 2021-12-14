@@ -19,8 +19,8 @@ package com.alibaba.nacos.config.server.auth;
 import com.alibaba.nacos.config.server.configuration.ConditionOnExternalStorage;
 import com.alibaba.nacos.config.server.model.Page;
 import com.alibaba.nacos.config.server.model.User;
-import com.alibaba.nacos.config.server.service.repository.extrnal.ExternalStoragePersistServiceImpl;
 import com.alibaba.nacos.config.server.service.repository.PaginationHelper;
+import com.alibaba.nacos.config.server.service.repository.extrnal.ExternalStoragePersistServiceImpl;
 import com.alibaba.nacos.config.server.utils.LogUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Conditional;
@@ -43,17 +43,17 @@ import static com.alibaba.nacos.config.server.service.repository.RowMapperManage
 @Conditional(value = ConditionOnExternalStorage.class)
 @Component
 public class ExternalUserPersistServiceImpl implements UserPersistService {
-    
+
     @Autowired
     private ExternalStoragePersistServiceImpl persistService;
-    
+
     private JdbcTemplate jt;
-    
+
     @PostConstruct
     protected void init() {
         jt = persistService.getJdbcTemplate();
     }
-    
+
     /**
      * Execute create user operation.
      *
@@ -63,7 +63,7 @@ public class ExternalUserPersistServiceImpl implements UserPersistService {
     @Override
     public void createUser(String username, String password) {
         String sql = "INSERT INTO users (username, password, enabled) VALUES (?, ?, ?)";
-        
+
         try {
             jt.update(sql, username, password, true);
         } catch (CannotGetJdbcConnectionException e) {
@@ -71,7 +71,7 @@ public class ExternalUserPersistServiceImpl implements UserPersistService {
             throw e;
         }
     }
-    
+
     /**
      * Execute delete user operation.
      *
@@ -87,7 +87,7 @@ public class ExternalUserPersistServiceImpl implements UserPersistService {
             throw e;
         }
     }
-    
+
     /**
      * Execute update user password operation.
      *
@@ -103,7 +103,7 @@ public class ExternalUserPersistServiceImpl implements UserPersistService {
             throw e;
         }
     }
-    
+
     /**
      * Execute find user by username operation.
      *
@@ -114,7 +114,7 @@ public class ExternalUserPersistServiceImpl implements UserPersistService {
     public User findUserByUsername(String username) {
         String sql = "SELECT username,password FROM users WHERE username=? ";
         try {
-            return this.jt.queryForObject(sql, new Object[] {username}, USER_ROW_MAPPER);
+            return this.jt.queryForObject(sql, new Object[]{username}, USER_ROW_MAPPER);
         } catch (CannotGetJdbcConnectionException e) {
             LogUtil.FATAL_LOG.error("[db-error] " + e.toString(), e);
             throw e;
@@ -125,18 +125,18 @@ public class ExternalUserPersistServiceImpl implements UserPersistService {
             throw new RuntimeException(e);
         }
     }
-    
+
     @Override
     public Page<User> getUsers(int pageNo, int pageSize) {
-        
+
         PaginationHelper<User> helper = persistService.createPaginationHelper();
-        
+
         String sqlCountRows = "SELECT count(*) FROM users WHERE ";
 
         String sqlFetchRows = "SELECT username,password FROM users WHERE ";
-        
+
         String where = " 1=1 ";
-        
+
         try {
             Page<User> pageInfo = helper
                     .fetchPage(sqlCountRows + where, sqlFetchRows + where, new ArrayList<String>().toArray(), pageNo,
@@ -155,8 +155,8 @@ public class ExternalUserPersistServiceImpl implements UserPersistService {
 
     @Override
     public List<String> findUserLikeUsername(String username) {
-        String sql = "SELECT username FROM users WHERE username LIKE '%' ? '%'";
-        List<String> users = this.jt.queryForList(sql, new String[]{username}, String.class);
+        String sql = "SELECT username FROM users WHERE username like '%" + username + "%'";
+        List<String> users = this.jt.queryForList(sql, null, String.class);
         return users;
     }
 }

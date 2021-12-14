@@ -30,12 +30,7 @@ import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.util.List;
 
 import static com.alibaba.nacos.config.server.utils.LogUtil.FATAL_LOG;
@@ -48,21 +43,21 @@ import static com.alibaba.nacos.config.server.utils.LogUtil.FATAL_LOG;
  */
 @Service
 public class TenantCapacityPersistService {
-    
+
     private static final TenantCapacityRowMapper TENANT_CAPACITY_ROW_MAPPER = new TenantCapacityRowMapper();
-    
+
     private JdbcTemplate jdbcTemplate;
-    
+
     private DataSourceService dataSourceService;
-    
+
     @PostConstruct
     public void init() {
         this.dataSourceService = DynamicDataSource.getInstance().getDataSource();
         this.jdbcTemplate = dataSourceService.getJdbcTemplate();
     }
-    
+
     private static final class TenantCapacityRowMapper implements RowMapper<TenantCapacity> {
-        
+
         @Override
         public TenantCapacity mapRow(ResultSet rs, int rowNum) throws SQLException {
             TenantCapacity tenantCapacity = new TenantCapacity();
@@ -76,18 +71,18 @@ public class TenantCapacityPersistService {
             return tenantCapacity;
         }
     }
-    
+
     public TenantCapacity getTenantCapacity(String tenantId) {
         String sql =
                 "SELECT id, quota, `usage`, `max_size`, max_aggr_count, max_aggr_size, tenant_id FROM tenant_capacity "
                         + "WHERE tenant_id=?";
-        List<TenantCapacity> list = jdbcTemplate.query(sql, new Object[] {tenantId}, TENANT_CAPACITY_ROW_MAPPER);
+        List<TenantCapacity> list = jdbcTemplate.query(sql, new Object[]{tenantId}, TENANT_CAPACITY_ROW_MAPPER);
         if (list.isEmpty()) {
             return null;
         }
         return list.get(0);
     }
-    
+
     /**
      * Insert TenantCapacity.
      *
@@ -103,7 +98,9 @@ public class TenantCapacityPersistService {
             PreparedStatementCreator preparedStatementCreator = new PreparedStatementCreator() {
                 @Override
                 public PreparedStatement createPreparedStatement(Connection connection) throws SQLException {
-                    PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+                    //PreparedStatement ps = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
+                    // support postgresql
+                    PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
                     String tenant = tenantCapacity.getTenant();
                     ps.setString(1, tenant);
                     ps.setInt(2, tenantCapacity.getQuota());
@@ -122,9 +119,9 @@ public class TenantCapacityPersistService {
             FATAL_LOG.error("[db-error]", e);
             throw e;
         }
-        
+
     }
-    
+
     /**
      * Increment UsageWithDefaultQuotaLimit.
      *
@@ -144,7 +141,7 @@ public class TenantCapacityPersistService {
             throw e;
         }
     }
-    
+
     /**
      * Increment UsageWithQuotaLimit.
      *
@@ -160,10 +157,10 @@ public class TenantCapacityPersistService {
         } catch (CannotGetJdbcConnectionException e) {
             FATAL_LOG.error("[db-error]", e);
             throw e;
-            
+
         }
     }
-    
+
     /**
      * Increment Usage.
      *
@@ -180,7 +177,7 @@ public class TenantCapacityPersistService {
             throw e;
         }
     }
-    
+
     /**
      * DecrementUsage.
      *
@@ -196,19 +193,19 @@ public class TenantCapacityPersistService {
             throw e;
         }
     }
-    
+
     /**
      * Update TenantCapacity.
      *
-     * @param tenant tenant string value.
-     * @param quota quota int value.
-     * @param maxSize maxSize int value.
+     * @param tenant       tenant string value.
+     * @param quota        quota int value.
+     * @param maxSize      maxSize int value.
      * @param maxAggrCount maxAggrCount int value.
-     * @param maxAggrSize maxAggrSize int value.
+     * @param maxAggrSize  maxAggrSize int value.
      * @return operate result.
      */
     public boolean updateTenantCapacity(String tenant, Integer quota, Integer maxSize, Integer maxAggrCount,
-            Integer maxAggrSize) {
+                                        Integer maxAggrSize) {
         List<Object> argList = CollectionUtils.list();
         StringBuilder sql = new StringBuilder("UPDATE tenant_capacity SET");
         if (quota != null) {
@@ -229,7 +226,7 @@ public class TenantCapacityPersistService {
         }
         sql.append(" gmt_modified = ?");
         argList.add(TimeUtils.getCurrentTime());
-        
+
         sql.append(" WHERE tenant_id = ?");
         argList.add(tenant);
         try {
@@ -239,15 +236,15 @@ public class TenantCapacityPersistService {
             throw e;
         }
     }
-    
+
     public boolean updateQuota(String tenant, Integer quota) {
         return updateTenantCapacity(tenant, quota, null, null, null);
     }
-    
+
     /**
      * Correct Usage.
      *
-     * @param tenant tenant.
+     * @param tenant      tenant.
      * @param gmtModified gmtModified.
      * @return operate result.
      */
@@ -261,7 +258,7 @@ public class TenantCapacityPersistService {
             throw e;
         }
     }
-    
+
     /**
      * Get TenantCapacity List, only including id and tenantId value.
      *
@@ -271,13 +268,13 @@ public class TenantCapacityPersistService {
      */
     public List<TenantCapacity> getCapacityList4CorrectUsage(long lastId, int pageSize) {
         String sql = "SELECT id, tenant_id FROM tenant_capacity WHERE id>? LIMIT ?";
-        
+
         if (PropertyUtil.isEmbeddedStorage()) {
             sql = "SELECT id, tenant_id FROM tenant_capacity WHERE id>? OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY";
         }
-        
+
         try {
-            return jdbcTemplate.query(sql, new Object[] {lastId, pageSize}, new RowMapper<TenantCapacity>() {
+            return jdbcTemplate.query(sql, new Object[]{lastId, pageSize}, new RowMapper<TenantCapacity>() {
                 @Override
                 public TenantCapacity mapRow(ResultSet rs, int rowNum) throws SQLException {
                     TenantCapacity tenantCapacity = new TenantCapacity();
@@ -291,7 +288,7 @@ public class TenantCapacityPersistService {
             throw e;
         }
     }
-    
+
     /**
      * Delete TenantCapacity.
      *
