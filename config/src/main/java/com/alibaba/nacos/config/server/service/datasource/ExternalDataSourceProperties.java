@@ -45,6 +45,7 @@ public class ExternalDataSourceProperties {
     private List<String> user = new ArrayList<>();
 
     private List<String> password = new ArrayList<>();
+
     private List<String> driverClassName = new ArrayList<>();
 
     public void setNum(Integer num) {
